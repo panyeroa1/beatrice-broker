@@ -35,9 +35,13 @@ function ControlTray({ children }: ControlTrayProps) {
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0);
+  const [isClipped, setIsClipped] = useState(false);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const micButtonRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // History for rolling graph
+  const historyRef = useRef<number[]>(new Array(30).fill(0));
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
 
@@ -51,6 +55,8 @@ function ControlTray({ children }: ControlTrayProps) {
     if (!connected) {
       setMuted(false);
       setVolume(0);
+      setIsClipped(false);
+      historyRef.current.fill(0);
     }
   }, [connected]);
 
@@ -64,20 +70,29 @@ function ControlTray({ children }: ControlTrayProps) {
       ]);
     };
     
-    const onVolume = (vol: number) => {
-        setVolume(vol);
+    const onVolumetrics = (metrics: { volume: number; clipped: boolean }) => {
+        setVolume(metrics.volume);
+        if (metrics.clipped) {
+          setIsClipped(true);
+          // Auto-reset clip indicator after a short delay
+          setTimeout(() => setIsClipped(false), 1000);
+        }
+        
+        // Update history
+        historyRef.current.shift();
+        historyRef.current.push(metrics.volume);
     };
 
     if (connected && !muted && audioRecorder) {
       audioRecorder.on('data', onData);
-      audioRecorder.on('volume', onVolume);
+      audioRecorder.on('volumetrics', onVolumetrics);
       audioRecorder.start();
     } else {
       audioRecorder.stop();
     }
     return () => {
       audioRecorder.off('data', onData);
-      audioRecorder.off('volume', onVolume);
+      audioRecorder.off('volumetrics', onVolumetrics);
     };
   }, [connected, client, muted, audioRecorder]);
 
@@ -90,31 +105,41 @@ function ControlTray({ children }: ControlTrayProps) {
               
               ctx.clearRect(0, 0, width, height);
               
-              // Draw background
-              ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+              // Draw background grid
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
               ctx.fillRect(0, 0, width, height);
               
-              // Draw level (amplified for visibility)
-              const v = Math.min(1, volume * 6); 
-              const h = v * height;
+              // Draw rolling graph
+              const barWidth = width / historyRef.current.length;
               
-              // Color based on level
-              if (v > 0.9) ctx.fillStyle = '#ff4600'; // Clip
-              else if (v > 0.6) ctx.fillStyle = '#ffbb33'; // High
-              else ctx.fillStyle = '#4285f4'; // Normal
+              historyRef.current.forEach((val, i) => {
+                const x = i * barWidth;
+                const h = Math.min(1, val * 5) * height; // amplify for visual
+                const y = height - h;
+                
+                // Color based on intensity
+                if (val > 0.8) ctx.fillStyle = '#ff4600'; // Critical
+                else if (val > 0.5) ctx.fillStyle = '#ffbb33'; // High
+                else if (val > 0.1) ctx.fillStyle = '#4285f4'; // Active Voice
+                else ctx.fillStyle = '#3c4043'; // Noise Floor / Low
+                
+                ctx.fillRect(x, y, barWidth - 1, h);
+              });
               
-              // Draw from bottom up
-              ctx.fillRect(0, height - h, width, h);
+              // Draw Clip Indicator if clipped
+              if (isClipped) {
+                ctx.fillStyle = 'rgba(255, 70, 0, 0.3)';
+                ctx.fillRect(0, 0, width, height);
+              }
           }
       }
       
-      // Update mic button halo if ref exists
+      // Update mic button halo
       if (micButtonRef.current) {
-          // Map volume to a reasonable pixel range for the halo (e.g., 0 to 20px)
           const haloSize = Math.min(20, volume * 100); 
           micButtonRef.current.style.setProperty('--volume', `${haloSize}px`);
       }
-  }, [volume]);
+  }, [volume, isClipped]);
 
   const handleMicClick = () => {
     if (connected) {
@@ -137,7 +162,6 @@ function ControlTray({ children }: ControlTrayProps) {
       tools,
       conversation: turns.map(turn => ({
         ...turn,
-        // Convert Date object to ISO string for JSON serialization
         timestamp: turn.timestamp.toISOString(),
       })),
     };
@@ -165,7 +189,11 @@ function ControlTray({ children }: ControlTrayProps) {
 
   return (
     <section className="control-tray">
-      <canvas style={{ display: connected && !muted ? 'block' : 'none' }} className="vu-meter" ref={canvasRef} width="6" height="28" />
+      <div className={cn('audio-monitor', { hidden: !connected || muted })}>
+        <canvas className="audio-scope" ref={canvasRef} width="60" height="28" />
+        {isClipped && <div className="clip-indicator">CLIP</div>}
+      </div>
+      
       <nav className={cn('actions-nav')}>
         <button
           ref={micButtonRef}
@@ -213,6 +241,41 @@ function ControlTray({ children }: ControlTrayProps) {
         </div>
         <span className="text-indicator">Streaming</span>
       </div>
+      
+      <style>{`
+        .audio-monitor {
+          position: absolute;
+          left: -80px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: var(--Neutral-10);
+          border: 1px solid var(--Neutral-30);
+          border-radius: 8px;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .audio-scope {
+          border-radius: 4px;
+        }
+        .clip-indicator {
+          position: absolute;
+          top: -16px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: var(--Red-500);
+          color: white;
+          font-size: 9px;
+          font-weight: bold;
+          padding: 2px 4px;
+          border-radius: 4px;
+          pointer-events: none;
+        }
+        .audio-monitor.hidden {
+          display: none;
+        }
+      `}</style>
     </section>
   );
 }

@@ -190,6 +190,31 @@ export const useUI = create<{
 }));
 
 /**
+ * Supervisor (Agent Correction)
+ */
+export interface CorrectionSuggestion {
+  id: string;
+  timestamp: Date;
+  summary: string;
+  originalFeedback: string;
+  newSystemPrompt: string;
+}
+
+export const useSupervisor = create<{
+  suggestions: CorrectionSuggestion[];
+  isAnalyzing: boolean;
+  addSuggestion: (suggestion: CorrectionSuggestion) => void;
+  removeSuggestion: (id: string) => void;
+  setAnalyzing: (isAnalyzing: boolean) => void;
+}>(set => ({
+  suggestions: [],
+  isAnalyzing: false,
+  addSuggestion: (suggestion) => set(state => ({ suggestions: [suggestion, ...state.suggestions] })),
+  removeSuggestion: (id) => set(state => ({ suggestions: state.suggestions.filter(s => s.id !== id) })),
+  setAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
+}));
+
+/**
  * Tools
  */
 export interface FunctionCall {

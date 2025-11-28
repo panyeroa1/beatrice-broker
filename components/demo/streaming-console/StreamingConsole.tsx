@@ -14,8 +14,10 @@ import {
   useSettings,
   useLogStore,
   useTools,
+  useSupervisor,
   ConversationTurn,
 } from '@/lib/state';
+import { checkCorrection } from '@/lib/supervisor';
 
 const formatTimestamp = (date: Date) => {
   const pad = (num: number, size = 2) => num.toString().padStart(size, '0');
@@ -57,8 +59,14 @@ export default function StreamingConsole() {
   const { systemPrompt, voice, style, googleSearch } = useSettings();
   const { tools } = useTools();
   const turns = useLogStore(state => state.turns);
+  const { addSuggestion, setAnalyzing } = useSupervisor();
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showPopUp, setShowPopUp] = useState(true);
+
+  // We need to access the API key to perform the supervisor check.
+  // Ideally this is passed via context, but process.env is accessible here.
+  const API_KEY = process.env.API_KEY as string;
 
   const handleClosePopUp = () => {
     setShowPopUp(false);
@@ -137,7 +145,7 @@ export default function StreamingConsole() {
   useEffect(() => {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
-    const handleInputTranscription = (text: string, isFinal: boolean) => {
+    const handleInputTranscription = async (text: string, isFinal: boolean) => {
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
       if (last && last.role === 'user' && !last.isFinal) {
@@ -147,6 +155,29 @@ export default function StreamingConsole() {
         });
       } else {
         addTurn({ role: 'user', text, isFinal });
+      }
+
+      // SUPERVISOR CHECK
+      // If the user's input is final and has substance, check for corrections
+      if (isFinal && text.trim().length > 5) {
+        const currentPrompt = useSettings.getState().systemPrompt;
+        const history = useLogStore.getState().turns;
+        
+        setAnalyzing(true);
+        // Run check asynchronously so we don't block
+        checkCorrection(API_KEY, currentPrompt, text, history)
+          .then(result => {
+             if (result.detected && result.newSystemPrompt) {
+               addSuggestion({
+                 id: crypto.randomUUID(),
+                 timestamp: new Date(),
+                 originalFeedback: text,
+                 summary: result.summary || 'User correction',
+                 newSystemPrompt: result.newSystemPrompt
+               });
+             }
+          })
+          .finally(() => setAnalyzing(false));
       }
     };
 

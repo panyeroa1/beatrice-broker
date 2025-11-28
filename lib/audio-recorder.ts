@@ -95,9 +95,12 @@ export class AudioRecorder {
              const arrayBufferString = arrayBufferToBase64(data.int16arrayBuffer);
              this.emitter.emit('data', arrayBufferString);
           }
-          // Process volume metric
+          // Process volumetrics (volume + clipping)
           if (typeof data.volume === 'number') {
-             this.emitter.emit('volume', data.volume);
+             this.emitter.emit('volumetrics', { 
+               volume: data.volume, 
+               clipped: data.clipped ?? false 
+             });
           }
         }
       };

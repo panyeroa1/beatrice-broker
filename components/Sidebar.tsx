@@ -3,7 +3,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { FunctionCall, useSettings, useUI, useTools } from '@/lib/state';
+import { FunctionCall, useSettings, useUI, useTools, useSupervisor } from '@/lib/state';
 import c from 'classnames';
 import { DEFAULT_LIVE_API_MODEL, AVAILABLE_VOICES, AVAILABLE_STYLES } from '@/lib/constants';
 import { useLiveAPIContext } from '@/contexts/LiveAPIContext';
@@ -20,14 +20,21 @@ export default function Sidebar() {
     useSettings();
   const { tools, toggleTool, addTool, removeTool, updateTool } = useTools();
   const { connected } = useLiveAPIContext();
+  const { suggestions, removeSuggestion, isAnalyzing } = useSupervisor();
 
   const [editingTool, setEditingTool] = useState<FunctionCall | null>(null);
+  const [isCorrectionsOpen, setIsCorrectionsOpen] = useState(true);
 
   const handleSaveTool = (updatedTool: FunctionCall) => {
     if (editingTool) {
       updateTool(editingTool.name, updatedTool);
     }
     setEditingTool(null);
+  };
+
+  const applyCorrection = (id: string, newPrompt: string) => {
+    setSystemPrompt(newPrompt);
+    removeSuggestion(id);
   };
 
   return (
@@ -40,6 +47,51 @@ export default function Sidebar() {
           </button>
         </div>
         <div className="sidebar-content">
+          
+          {/* Correction Section */}
+          <div className="sidebar-section">
+             <button 
+               className="accordion-header" 
+               onClick={() => setIsCorrectionsOpen(!isCorrectionsOpen)}
+             >
+               <span className="icon">{isCorrectionsOpen ? 'expand_more' : 'chevron_right'}</span>
+               <h4 className="sidebar-section-title" style={{marginBottom:0}}>
+                 Attention: Agent Correction
+                 {suggestions.length > 0 && <span className="badge">{suggestions.length}</span>}
+               </h4>
+               {isAnalyzing && <span className="analyzing-spinner icon">sync</span>}
+             </button>
+             
+             {isCorrectionsOpen && (
+               <div className="corrections-list">
+                 {suggestions.length === 0 ? (
+                   <div className="empty-state">No corrections detected yet.</div>
+                 ) : (
+                   suggestions.map(s => (
+                     <div key={s.id} className="correction-card">
+                       <div className="correction-header">
+                         <span className="icon warning-icon">warning</span>
+                         <span className="timestamp">{s.timestamp.toLocaleTimeString()}</span>
+                       </div>
+                       <p className="correction-summary"><strong>User said:</strong> "{s.originalFeedback}"</p>
+                       <p className="correction-summary"><strong>Fix:</strong> {s.summary}</p>
+                       <div className="correction-actions">
+                         <button onClick={() => applyCorrection(s.id, s.newSystemPrompt)} className="apply-btn">
+                           Apply Fix
+                         </button>
+                         <button onClick={() => removeSuggestion(s.id)} className="dismiss-btn">
+                           Dismiss
+                         </button>
+                       </div>
+                     </div>
+                   ))
+                 )}
+               </div>
+             )}
+          </div>
+          
+          <hr className="divider" />
+
           <div className="sidebar-section">
             <fieldset disabled={connected}>
               <label>
@@ -153,6 +205,106 @@ export default function Sidebar() {
           onSave={handleSaveTool}
         />
       )}
+      <style>{`
+        .accordion-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: none;
+          border: none;
+          color: var(--gray-200);
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+          padding: 4px 0;
+        }
+        .accordion-header:hover {
+          color: white;
+        }
+        .badge {
+          background: var(--Red-500);
+          color: white;
+          font-size: 10px;
+          padding: 2px 6px;
+          border-radius: 99px;
+          font-weight: bold;
+          margin-left: auto;
+        }
+        .analyzing-spinner {
+          animation: spin 1s linear infinite;
+          margin-left: 8px;
+          font-size: 16px;
+          color: var(--Blue-400);
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        .corrections-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 12px;
+          margin-bottom: 12px;
+        }
+        .empty-state {
+          font-size: 13px;
+          color: var(--gray-500);
+          font-style: italic;
+          padding: 8px;
+        }
+        .correction-card {
+          background: var(--Neutral-15);
+          border: 1px solid var(--Red-700);
+          border-radius: 8px;
+          padding: 12px;
+        }
+        .correction-header {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .warning-icon {
+          color: var(--Red-500);
+          font-size: 18px;
+        }
+        .timestamp {
+          font-size: 11px;
+          color: var(--gray-500);
+        }
+        .correction-summary {
+          font-size: 13px;
+          margin-bottom: 6px;
+          line-height: 1.4;
+          color: var(--gray-200);
+        }
+        .correction-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .apply-btn {
+          background: var(--Green-700);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          flex: 1;
+          justify-content: center;
+        }
+        .apply-btn:hover { background: var(--Green-500); }
+        .dismiss-btn {
+          background: var(--Neutral-30);
+          color: var(--gray-200);
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+        }
+        .dismiss-btn:hover { background: var(--Neutral-50); }
+        .divider {
+          border: 0;
+          border-top: 1px solid var(--gray-800);
+          margin: 0;
+        }
+      `}</style>
     </>
   );
 }
