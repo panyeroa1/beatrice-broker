@@ -19,39 +19,6 @@ import {
 } from '@/lib/state';
 import { checkCorrection } from '@/lib/supervisor';
 
-const SILENCE_BREAKERS = [
-  "You there?",
-  "Still with me?",
-  "Did I lose you?",
-  "Signal check.",
-  "Are you still there?",
-  "Just checking in.",
-  "Helloww?",
-  "Still connected?",
-  "Anyone home?",
-  "You got quiet.",
-  "Line check.",
-  "Did the audio drop?",
-  "Is the line okay?",
-  "Still on the line?",
-  "Just making sure.",
-  "Are we good?",
-  "You okay?",
-  "Did I disconnect?",
-  "Still tracking?",
-  "Audio check.",
-  "You went silent.",
-  "Are you thinking?",
-  "Is this working?",
-  "Mic check.",
-  "Still listening?",
-  "I'm listening.",
-  "Still with us?",
-  "Connection check.",
-  "You quiet?",
-  "Hello?"
-];
-
 const formatTimestamp = (date: Date) => {
   const pad = (num: number, size = 2) => num.toString().padStart(size, '0');
   const hours = pad(date.getHours());
@@ -101,27 +68,12 @@ export default function StreamingConsole() {
   const lastActivityRef = useRef(Date.now());
   const silenceStageRef = useRef<number>(0); // 0 = none, 1 = warning, 2 = persistent
 
-  // Dynamic Silence Breakers Pool
-  const availableBreakers = useRef<string[]>([...SILENCE_BREAKERS]);
-
   // We need to access the API key to perform the supervisor check.
   // Ideally this is passed via context, but process.env is accessible here.
   const API_KEY = process.env.API_KEY as string;
 
   const handleClosePopUp = () => {
     setShowPopUp(false);
-  };
-
-  const getNextSilenceBreaker = () => {
-    if (availableBreakers.current.length === 0) {
-      // Reset pool if exhausted
-      availableBreakers.current = [...SILENCE_BREAKERS];
-    }
-    const randomIndex = Math.floor(Math.random() * availableBreakers.current.length);
-    const phrase = availableBreakers.current[randomIndex];
-    // Remove selected to avoid repetition
-    availableBreakers.current.splice(randomIndex, 1);
-    return phrase;
   };
 
   useEffect(() => {
@@ -155,21 +107,19 @@ export default function StreamingConsole() {
       
       const timeSinceActivity = Date.now() - lastActivityRef.current;
       
-      // Stage 1: 12 seconds - Short silence check-in
+      // Stage 1: 12 seconds - Natural Contextual Re-engagement
       if (timeSinceActivity > 12000 && silenceStageRef.current === 0) {
         silenceStageRef.current = 1;
         
-        const phrase = getNextSilenceBreaker();
-
-        // Send system message to model with EXACT phrase
+        // Dynamic Context Instruction
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: The user has been silent for 12 seconds. Say exactly: "${phrase}"]` 
+          text: `[SYSTEM_NOTIFICATION: User silence detected (12s). ACTION: Re-engage naturally. 1. Refer back to the last topic/question to clarify. 2. OR use a non-verbal cue like "[clears throat]" or "[sigh]" to check presence. 3. Mirror their vibe. 4. Focus on the deal/job. Do NOT just say "Hello".]` 
         }]);
 
         // Log to console UI
         useLogStore.getState().addTurn({
           role: 'system',
-          text: `⚡ System: Silence detected (12s) - Prompting: "${phrase}"`,
+          text: `⚡ System: Silence detected (12s) - Requesting context-aware re-engagement`,
           isFinal: true
         });
       }
