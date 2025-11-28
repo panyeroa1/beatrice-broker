@@ -153,7 +153,7 @@ function ControlTray({ children }: ControlTrayProps) {
     const { systemPrompt, model } = useSettings.getState();
     const { tools } = useTools.getState();
     const { turns } = useLogStore.getState();
-    const { suggestions } = useSupervisor.getState();
+    const { suggestions, appliedCorrections } = useSupervisor.getState();
 
     const logData = {
       configuration: {
@@ -162,6 +162,7 @@ function ControlTray({ children }: ControlTrayProps) {
       },
       tools,
       suggestions,
+      appliedCorrections,
       conversation: turns.map(turn => ({
         ...turn,
         timestamp: turn.timestamp.toISOString(),

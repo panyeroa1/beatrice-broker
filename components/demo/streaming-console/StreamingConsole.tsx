@@ -64,6 +64,10 @@ export default function StreamingConsole() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showPopUp, setShowPopUp] = useState(true);
 
+  // Silence Detection Refs
+  const lastActivityRef = useRef(Date.now());
+  const silenceStageRef = useRef<number>(0); // 0 = none, 1 = warning, 2 = persistent
+
   // We need to access the API key to perform the supervisor check.
   // Ideally this is passed via context, but process.env is accessible here.
   const API_KEY = process.env.API_KEY as string;
@@ -95,6 +99,50 @@ export default function StreamingConsole() {
       audio.currentTime = 0;
     };
   }, [connected]);
+
+  // Silence Detection Timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!connected) return;
+      
+      const timeSinceActivity = Date.now() - lastActivityRef.current;
+      
+      // Stage 1: 8 seconds - Gentle re-engagement
+      if (timeSinceActivity > 8000 && silenceStageRef.current === 0) {
+        silenceStageRef.current = 1;
+        
+        // Send system message to model
+        client.send([{ 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 8 seconds. Pick one of your 30 short silence breakers (e.g. "Hello?", "You there?") to check in naturally.]` 
+        }]);
+
+        // Log to console UI
+        useLogStore.getState().addTurn({
+          role: 'system',
+          text: '⚡ System: Silence detected (8s) - Triggering check-in',
+          isFinal: true
+        });
+      }
+
+      // Stage 2: 20 seconds - Persistent silence / Audio check
+      if (timeSinceActivity > 20000 && silenceStageRef.current === 1) {
+        silenceStageRef.current = 2;
+        
+        client.send([{ 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 20 seconds. There might be an audio issue. Ask "Can you hear me?" or politely offer to pause the call if they are busy.]` 
+        }]);
+
+        useLogStore.getState().addTurn({
+          role: 'system',
+          text: '⚡ System: Persistent silence (20s) - Triggering connection check',
+          isFinal: true
+        });
+      }
+
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [connected, client]);
 
   // Set the configuration for the Live API
   useEffect(() => {
@@ -146,6 +194,13 @@ export default function StreamingConsole() {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
     const handleInputTranscription = async (text: string, isFinal: boolean) => {
+      // Update activity timestamp
+      lastActivityRef.current = Date.now();
+      // Reset silence trigger if user speaks
+      if (isFinal || text.length > 0) {
+        silenceStageRef.current = 0;
+      }
+
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
       if (last && last.role === 'user' && !last.isFinal) {
@@ -195,6 +250,9 @@ export default function StreamingConsole() {
     };
 
     const handleOutputTranscription = (text: string, isFinal: boolean) => {
+      // Update activity timestamp when agent speaks
+      lastActivityRef.current = Date.now();
+      
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
       if (last && last.role === 'agent' && !last.isFinal) {

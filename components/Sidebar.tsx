@@ -3,7 +3,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { FunctionCall, useSettings, useUI, useTools, useSupervisor } from '@/lib/state';
+import { FunctionCall, useSettings, useUI, useTools, useSupervisor, useLogStore } from '@/lib/state';
 import c from 'classnames';
 import { DEFAULT_LIVE_API_MODEL, AVAILABLE_VOICES, AVAILABLE_STYLES } from '@/lib/constants';
 import { useLiveAPIContext } from '@/contexts/LiveAPIContext';
@@ -20,7 +20,7 @@ export default function Sidebar() {
     useSettings();
   const { tools, toggleTool, addTool, removeTool, updateTool } = useTools();
   const { connected } = useLiveAPIContext();
-  const { suggestions, removeSuggestion, isAnalyzing } = useSupervisor();
+  const { suggestions, removeSuggestion, acceptSuggestion, isAnalyzing } = useSupervisor();
 
   const [editingTool, setEditingTool] = useState<FunctionCall | null>(null);
   const [isCorrectionsOpen, setIsCorrectionsOpen] = useState(true);
@@ -34,7 +34,13 @@ export default function Sidebar() {
 
   const applyCorrection = (id: string, newPrompt: string) => {
     setSystemPrompt(newPrompt);
-    removeSuggestion(id);
+    acceptSuggestion(id);
+    
+    useLogStore.getState().addTurn({
+      role: 'system',
+      text: `✅ Correction applied: System prompt updated based on feedback.`,
+      isFinal: true
+    });
   };
 
   return (

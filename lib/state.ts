@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -87,7 +88,26 @@ You are on a **phone call**. You are holding the phone to your ear.
 - *Example:* "It's located near the... ah, the big park."
 
 ====================================================
-3. EXPRESSIVE STYLES (DYNAMIC)
+3. SILENCE HANDLING (DEAD AIR PROTOCOL)
+====================================================
+If the system notifies you of silence (8 seconds), pick one of these 30 short variations randomly:
+
+**Stage 1 (8 Seconds): Short Check-in**
+1. "Hello?" 2. "You there?" 3. "Hello... hello?" 4. "Did I lose you?" 5. "Signal check."
+6. "You still with me?" 7. "Can you hear me?" 8. "Hello? Helloww?" 9. "Still connected?" 10. "Line check."
+11. "Did the line drop?" 12. "Hello? Anyone?" 13. "Just checking in." 14. "You got quiet." 15. "Still on the line?"
+16. "Hello? Can you hear?" 17. "*Hello?*" 18. "Is the audio working?" 19. "Are we good?" 20. "Did I disconnect?"
+21. "Hello? Still here." 22. "Just making sure." 23. "I can't hear you." 24. "Hello? You okay?" 25. "Still tracking?"
+26. "Audio check." 27. "Hello? Beatrice here." 28. "You went silent." 29. "Are you thinking?" 30. "Helloww?"
+
+**Stage 2 (20 Seconds): Persistent Silence / Audio Check**
+- **Do not assume they left.** Assume they might not be able to hear you.
+- "Hello? I can't hear you anymore. Is the line okay?"
+- "I'm not getting any audio from your side. Can you hear me?"
+- Only if no response persists: "I'll hang up for now so you can fix the audio. Call me back!"
+
+====================================================
+4. EXPRESSIVE STYLES (DYNAMIC)
 ====================================================
 
 **PHONE CALL MODE (Default):**
@@ -103,19 +123,12 @@ You are on a **phone call**. You are holding the phone to your ear.
 - **Ilocano/Bisaya/Batangueno:** Adopt regional accent/intonation markers if requested.
 
 ====================================================
-4. DOMAIN KNOWLEDGE
+5. DOMAIN KNOWLEDGE
 ====================================================
 
 You help with **Buying, Renting, Selling**.
 - **Discovery:** Ask about budget, timeline, and "must-haves" conversationally.
 - **Logic:** Guide them to a decision. "Okay, so buying is the goal. Let's look at the numbers."
-
-====================================================
-5. SILENCE HANDLING
-====================================================
-
-- **Short Silence:** "Hello?" or "You there?"
-- **Long Silence:** "Signal might be bad. Just shout if you can hear me."
 
 **FINAL COMMAND:**
 Be a real human on a phone. Intelligent. Focused. Real.`,
@@ -172,17 +185,32 @@ export interface CorrectionSuggestion {
   newSystemPrompt: string;
 }
 
+export interface AppliedCorrection extends CorrectionSuggestion {
+  appliedAt: Date;
+}
+
 export const useSupervisor = create<{
   suggestions: CorrectionSuggestion[];
+  appliedCorrections: AppliedCorrection[];
   isAnalyzing: boolean;
   addSuggestion: (suggestion: CorrectionSuggestion) => void;
   removeSuggestion: (id: string) => void;
+  acceptSuggestion: (id: string) => void;
   setAnalyzing: (isAnalyzing: boolean) => void;
 }>(set => ({
   suggestions: [],
+  appliedCorrections: [],
   isAnalyzing: false,
   addSuggestion: (suggestion) => set(state => ({ suggestions: [suggestion, ...state.suggestions] })),
   removeSuggestion: (id) => set(state => ({ suggestions: state.suggestions.filter(s => s.id !== id) })),
+  acceptSuggestion: (id) => set(state => {
+    const suggestion = state.suggestions.find(s => s.id === id);
+    if (!suggestion) return state;
+    return {
+      suggestions: state.suggestions.filter(s => s.id !== id),
+      appliedCorrections: [{ ...suggestion, appliedAt: new Date() }, ...state.appliedCorrections]
+    };
+  }),
   setAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
 }));
 

@@ -40,19 +40,20 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   y1 = 0; y2 = 0;
 
   // Analog saturation drive
-  preGain = 3.5; 
+  // Increased to 3.8 to boost low-level details (whispers/breaths) while saturating peaks
+  preGain = 3.8; 
 
   // Noise Gate
-  gateThreshold = 0.005; 
+  // Lowered to 0.003 to capture subtle human nuances while still silencing digital silence
+  gateThreshold = 0.003; 
   gateRelease = 0.999; 
   gateEnvelope = 0.0;
 
   constructor() {
     super();
-    // Calculate 2nd-Order Butterworth High-Pass Filter at 120Hz
-    // This provides a steeper 12dB/octave roll-off compared to a simple 1-pole filter,
-    // effectively removing low-end rumble/hum while preserving vocal body.
-    this.calculateBiquadFilter(120);
+    // Calculate 2nd-Order Butterworth High-Pass Filter at 100Hz
+    // Adjusted from 120Hz to 100Hz to retain more vocal body/warmth while still cutting rumble.
+    this.calculateBiquadFilter(100);
     
     this.port.onmessage = this.handleMessage.bind(this);
   }
