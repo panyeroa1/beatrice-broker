@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -33,31 +34,45 @@ export const audioContext: (
   });
 
   return async (options?: GetAudioContextOptions) => {
+    // Helper to get or create context
+    const getContext = (opts?: AudioContextOptions) => {
+      // @ts-ignore - Vendor prefix support
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      return new AudioContextClass(opts);
+    };
+
     try {
       const a = new Audio();
       a.src =
         'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
       await a.play();
+      
       if (options?.id && map.has(options.id)) {
         const ctx = map.get(options.id);
-        if (ctx) {
+        if (ctx && ctx.state !== 'closed') {
           return ctx;
         }
       }
-      const ctx = new AudioContext(options);
+
+      // Explicitly pass sampleRate to avoid browser resampling if possible
+      const ctx = getContext(options);
+      
       if (options?.id) {
         map.set(options.id, ctx);
       }
       return ctx;
     } catch (e) {
       await didInteract;
+      
       if (options?.id && map.has(options.id)) {
         const ctx = map.get(options.id);
-        if (ctx) {
+        if (ctx && ctx.state !== 'closed') {
+          await ctx.resume();
           return ctx;
         }
       }
-      const ctx = new AudioContext(options);
+      
+      const ctx = getContext(options);
       if (options?.id) {
         map.set(options.id, ctx);
       }

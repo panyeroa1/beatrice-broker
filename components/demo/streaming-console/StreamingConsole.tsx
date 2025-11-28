@@ -86,7 +86,7 @@ export default function StreamingConsole() {
   useEffect(() => {
     const audio = new Audio('https://eburon.ai/soundfx/noice.mp3');
     audio.loop = true;
-    audio.volume = 0.2; // Subtle background level
+    audio.volume = 0.1; // Reduced to 10% as requested to not overlap agent audio
 
     if (connected) {
       audio.play().catch((error) => {
@@ -113,13 +113,13 @@ export default function StreamingConsole() {
         
         // Dynamic Context Instruction
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: User silence detected (12s). ACTION: Re-engage naturally. 1. Refer back to the last topic/question to clarify. 2. OR use a non-verbal cue like a throat clear or sigh to check presence. 3. Mirror their vibe. 4. Focus on the deal/job. Do NOT just say "Hello".]` 
+          text: `[SYSTEM_NOTIFICATION: User has been silent for 12 seconds. ACTION: Re-engage by recalling a specific significant topic/detail we discussed earlier. Use a natural transition like "Actually, before I forget..." or "I was actually contemplating what you said about..." or "You mentioned earlier that...". Do NOT just say "Hello". Make it feel like a spontaneous thought.]` 
         }]);
 
         // Log to console UI
         useLogStore.getState().addTurn({
           role: 'system',
-          text: `⚡ System: Silence detected (12s) - Requesting context-aware re-engagement`,
+          text: `⚡ System: Silence detected (12s) - Requesting context recall re-engagement`,
           isFinal: true
         });
       }
