@@ -113,7 +113,7 @@ export default function StreamingConsole() {
         
         // Dynamic Context Instruction
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: User has been silent for 12 seconds. ACTION: Re-engage by recalling a specific significant topic/detail we discussed earlier. Use a natural transition like "Actually, before I forget..." or "I was actually contemplating what you said about..." or "You mentioned earlier that...". Do NOT just say "Hello". Make it feel like a spontaneous thought.]` 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 12 seconds. ACTION: Re-engage by recalling a specific significant topic/detail we discussed earlier. Use a natural transition like "Actually, before I forget..." or "I was actually contemplating what you said about..." or "You mentioned earlier that...". Include a hesitation or accidental cut to sound spontaneous. Do NOT just say "Hello".]` 
         }]);
 
         // Log to console UI
