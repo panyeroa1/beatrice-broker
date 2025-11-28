@@ -246,7 +246,7 @@ function ControlTray({ children }: ControlTrayProps) {
       </div>
       
       <style>{`
-        .audio-monitor {
+        .control-tray .audio-monitor {
           position: absolute;
           left: -80px;
           top: 50%;
@@ -259,10 +259,10 @@ function ControlTray({ children }: ControlTrayProps) {
           align-items: center;
           justify-content: center;
         }
-        .audio-scope {
+        .control-tray .audio-scope {
           border-radius: 4px;
         }
-        .clip-indicator {
+        .control-tray .clip-indicator {
           position: absolute;
           top: -16px;
           left: 50%;
@@ -275,7 +275,7 @@ function ControlTray({ children }: ControlTrayProps) {
           border-radius: 4px;
           pointer-events: none;
         }
-        .audio-monitor.hidden {
+        .control-tray .audio-monitor.hidden {
           display: none;
         }
       `}</style>
