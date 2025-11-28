@@ -113,7 +113,7 @@ export default function StreamingConsole() {
         
         // Dynamic Context Instruction
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: User silence detected (12s). ACTION: Re-engage naturally. 1. Refer back to the last topic/question to clarify. 2. OR use a non-verbal cue like "[clears throat]" or "[sigh]" to check presence. 3. Mirror their vibe. 4. Focus on the deal/job. Do NOT just say "Hello".]` 
+          text: `[SYSTEM_NOTIFICATION: User silence detected (12s). ACTION: Re-engage naturally. 1. Refer back to the last topic/question to clarify. 2. OR use a non-verbal cue like a throat clear or sigh to check presence. 3. Mirror their vibe. 4. Focus on the deal/job. Do NOT just say "Hello".]` 
         }]);
 
         // Log to console UI
@@ -194,12 +194,10 @@ export default function StreamingConsole() {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
     const handleInputTranscription = async (text: string, isFinal: boolean) => {
-      // Update activity timestamp
+      // Update activity timestamp on ANY user input
       lastActivityRef.current = Date.now();
-      // Reset silence trigger if user speaks
-      if (isFinal || text.length > 0) {
-        silenceStageRef.current = 0;
-      }
+      // Revoke silence trigger immediately
+      silenceStageRef.current = 0;
 
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
@@ -297,6 +295,8 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
+      // Ensure we count the end of the agent's turn as activity
+      lastActivityRef.current = Date.now();
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
       if (last && !last.isFinal) {
