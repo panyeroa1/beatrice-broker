@@ -107,19 +107,19 @@ export default function StreamingConsole() {
       
       const timeSinceActivity = Date.now() - lastActivityRef.current;
       
-      // Stage 1: 10 seconds - Gentle re-engagement
-      if (timeSinceActivity > 10000 && silenceStageRef.current === 0) {
+      // Stage 1: 12 seconds - Gentle re-engagement
+      if (timeSinceActivity > 12000 && silenceStageRef.current === 0) {
         silenceStageRef.current = 1;
         
         // Send system message to model
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: The user has been silent for 10 seconds. Pick one of your 30 short silence breakers (e.g. "Hello?", "Helloww?", "You there?") to check in naturally. Keep it short.]` 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 12 seconds. Pick one of your 30 short silence breakers (e.g. "Hello?", "Helloww?", "You there?") to check in naturally. Keep it short.]` 
         }]);
 
         // Log to console UI
         useLogStore.getState().addTurn({
           role: 'system',
-          text: '⚡ System: Silence detected (10s) - Triggering check-in',
+          text: '⚡ System: Silence detected (12s) - Triggering check-in',
           isFinal: true
         });
       }
