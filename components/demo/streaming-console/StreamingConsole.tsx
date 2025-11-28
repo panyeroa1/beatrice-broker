@@ -107,34 +107,34 @@ export default function StreamingConsole() {
       
       const timeSinceActivity = Date.now() - lastActivityRef.current;
       
-      // Stage 1: 8 seconds - Gentle re-engagement
-      if (timeSinceActivity > 8000 && silenceStageRef.current === 0) {
+      // Stage 1: 10 seconds - Gentle re-engagement
+      if (timeSinceActivity > 10000 && silenceStageRef.current === 0) {
         silenceStageRef.current = 1;
         
         // Send system message to model
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: The user has been silent for 8 seconds. Pick one of your 30 short silence breakers (e.g. "Hello?", "You there?") to check in naturally.]` 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 10 seconds. Pick one of your 30 short silence breakers (e.g. "Hello?", "Helloww?", "You there?") to check in naturally. Keep it short.]` 
         }]);
 
         // Log to console UI
         useLogStore.getState().addTurn({
           role: 'system',
-          text: '⚡ System: Silence detected (8s) - Triggering check-in',
+          text: '⚡ System: Silence detected (10s) - Triggering check-in',
           isFinal: true
         });
       }
 
-      // Stage 2: 20 seconds - Persistent silence / Audio check
-      if (timeSinceActivity > 20000 && silenceStageRef.current === 1) {
+      // Stage 2: 25 seconds - Persistent silence / Audio check
+      if (timeSinceActivity > 25000 && silenceStageRef.current === 1) {
         silenceStageRef.current = 2;
         
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: The user has been silent for 20 seconds. There might be an audio issue. Ask "Can you hear me?" or politely offer to pause the call if they are busy.]` 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 25 seconds. There might be an audio issue. Ask "Can you hear me?" or politely offer to pause the call if they are busy.]` 
         }]);
 
         useLogStore.getState().addTurn({
           role: 'system',
-          text: '⚡ System: Persistent silence (20s) - Triggering connection check',
+          text: '⚡ System: Persistent silence (25s) - Triggering connection check',
           isFinal: true
         });
       }

@@ -20,10 +20,11 @@ export default function Sidebar() {
     useSettings();
   const { tools, toggleTool, addTool, removeTool, updateTool } = useTools();
   const { connected } = useLiveAPIContext();
-  const { suggestions, removeSuggestion, acceptSuggestion, isAnalyzing } = useSupervisor();
+  const { suggestions, removeSuggestion, acceptSuggestion, isAnalyzing, appliedCorrections } = useSupervisor();
 
   const [editingTool, setEditingTool] = useState<FunctionCall | null>(null);
   const [isCorrectionsOpen, setIsCorrectionsOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const handleSaveTool = (updatedTool: FunctionCall) => {
     if (editingTool) {
@@ -54,7 +55,7 @@ export default function Sidebar() {
         </div>
         <div className="sidebar-content">
           
-          {/* Correction Section */}
+          {/* Correction Section (Pending) */}
           <div className="sidebar-section">
              <button 
                className="accordion-header" 
@@ -89,6 +90,39 @@ export default function Sidebar() {
                            Dismiss
                          </button>
                        </div>
+                     </div>
+                   ))
+                 )}
+               </div>
+             )}
+          </div>
+
+          {/* Correction History Section */}
+          <div className="sidebar-section">
+             <button 
+               className="accordion-header" 
+               onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+             >
+               <span className="icon">{isHistoryOpen ? 'expand_more' : 'chevron_right'}</span>
+               <h4 className="sidebar-section-title" style={{marginBottom:0}}>
+                 Corrections Log
+                 {appliedCorrections.length > 0 && <span className="badge gray">{appliedCorrections.length}</span>}
+               </h4>
+             </button>
+             
+             {isHistoryOpen && (
+               <div className="corrections-list">
+                 {appliedCorrections.length === 0 ? (
+                   <div className="empty-state">No corrections applied yet.</div>
+                 ) : (
+                   appliedCorrections.map(s => (
+                     <div key={s.id} className="correction-card history-card">
+                       <div className="correction-header">
+                         <span className="icon check-icon">check_circle</span>
+                         <span className="timestamp">{s.appliedAt.toLocaleTimeString()}</span>
+                       </div>
+                       <p className="correction-summary"><strong>Issue:</strong> {s.summary}</p>
+                       <p className="correction-summary"><strong>User said:</strong> "{s.originalFeedback}"</p>
                      </div>
                    ))
                  )}
@@ -236,6 +270,9 @@ export default function Sidebar() {
           font-weight: bold;
           margin-left: auto;
         }
+        .badge.gray {
+          background: var(--Neutral-50);
+        }
         .analyzing-spinner {
           animation: spin 1s linear infinite;
           margin-left: 8px;
@@ -263,6 +300,9 @@ export default function Sidebar() {
           border-radius: 8px;
           padding: 12px;
         }
+        .history-card {
+          border-color: var(--Green-700);
+        }
         .correction-header {
           display: flex;
           justify-content: space-between;
@@ -270,6 +310,10 @@ export default function Sidebar() {
         }
         .warning-icon {
           color: var(--Red-500);
+          font-size: 18px;
+        }
+        .check-icon {
+          color: var(--Green-500);
           font-size: 18px;
         }
         .timestamp {
