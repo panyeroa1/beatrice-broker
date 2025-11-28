@@ -82,24 +82,6 @@ export default function StreamingConsole() {
     }
   }, [style, connected, client]);
 
-  // Background noise effect
-  useEffect(() => {
-    const audio = new Audio('https://eburon.ai/soundfx/noice.mp3');
-    audio.loop = true;
-    audio.volume = 0.1; // Reduced to 10% as requested to not overlap agent audio
-
-    if (connected) {
-      audio.play().catch((error) => {
-        console.warn('Background audio playback failed:', error);
-      });
-    }
-
-    return () => {
-      audio.pause();
-      audio.currentTime = 0;
-    };
-  }, [connected]);
-
   // Silence Detection Timer
   useEffect(() => {
     const interval = setInterval(() => {
@@ -113,7 +95,7 @@ export default function StreamingConsole() {
         
         // Dynamic Context Instruction
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: The user has been silent for 12 seconds. ACTION: Re-engage by recalling a specific significant topic/detail we discussed earlier. Use a natural transition like "Actually, before I forget..." or "I was actually contemplating what you said about..." or "You mentioned earlier that...". Include a hesitation or accidental cut to sound spontaneous. Do NOT just say "Hello".]` 
+          text: `[SYSTEM_NOTIFICATION: User has been silent for 12 seconds. ACTION: Re-engage by recalling a specific significant topic/detail we discussed earlier. Use a natural transition like "Actually, before I forget..." or "I was actually contemplating what you said about..." or "You mentioned earlier that...". Do NOT just say "Hello". Make it feel like a spontaneous thought.]` 
         }]);
 
         // Log to console UI
