@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -22,24 +23,65 @@
 const AudioRecordingWorklet = `
 class AudioProcessingWorklet extends AudioWorkletProcessor {
 
-  // Reduced buffer to 128 samples (approx 8ms at 16kHz) for lowest possible latency
-  // matching the Web Audio API render quantum size
+  // Buffer size 128 matches the Web Audio API render quantum (approx 8ms at 16kHz)
   buffer = new Int16Array(128);
-  
-  // current write index
   bufferWriteIndex = 0;
   
   // Metrics
   sumSquares = 0;
   clipped = false;
   
-  // High-pass filter state (remove DC offset/rumble)
-  prevX = 0;
-  prevY = 0;
-  alpha = 0.97; // ~80Hz cutoff at 16kHz
+  // Biquad Filter Coefficients (High Pass)
+  b0 = 0; b1 = 0; b2 = 0;
+  a1 = 0; a2 = 0;
+  
+  // Filter State
+  x1 = 0; x2 = 0;
+  y1 = 0; y2 = 0;
+
+  // Analog saturation drive
+  preGain = 3.5; 
+
+  // Noise Gate
+  gateThreshold = 0.005; 
+  gateRelease = 0.999; 
+  gateEnvelope = 0.0;
 
   constructor() {
     super();
+    // Calculate 2nd-Order Butterworth High-Pass Filter at 120Hz
+    // This provides a steeper 12dB/octave roll-off compared to a simple 1-pole filter,
+    // effectively removing low-end rumble/hum while preserving vocal body.
+    this.calculateBiquadFilter(120);
+    
+    this.port.onmessage = this.handleMessage.bind(this);
+  }
+
+  calculateBiquadFilter(frequency) {
+    const nyquist = sampleRate / 2;
+    const normalizedFreq = frequency / nyquist;
+    
+    // Butterworth Q
+    const Q = 0.7071; 
+    const w0 = 2 * Math.PI * frequency / sampleRate;
+    const alpha = Math.sin(w0) / (2 * Q);
+    const cosw0 = Math.cos(w0);
+
+    const a0 = 1 + alpha;
+    
+    // HPF Coefficients
+    this.b0 = ((1 + cosw0) / 2) / a0;
+    this.b1 = (-(1 + cosw0)) / a0;
+    this.b2 = ((1 + cosw0) / 2) / a0;
+    this.a1 = (-2 * cosw0) / a0;
+    this.a2 = (1 - alpha) / a0;
+  }
+
+  handleMessage(event) {
+    if (event.data.type === 'configure') {
+      if (event.data.threshold !== undefined) this.gateThreshold = event.data.threshold;
+      if (event.data.release !== undefined) this.gateRelease = event.data.release;
+    }
   }
 
   process(inputs) {
@@ -51,7 +93,6 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   }
 
   sendAndClearBuffer(){
-    // Calculate RMS
     const rms = Math.sqrt(this.sumSquares / this.bufferWriteIndex);
     
     this.port.postMessage({
@@ -73,24 +114,44 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     for (let i = 0; i < l; i++) {
       let sample = float32Array[i];
       
-      // 1. High-pass filter (80Hz) to clean up low-end mud
-      const y = this.alpha * (this.prevY + sample - this.prevX);
-      this.prevX = sample;
-      this.prevY = y;
+      // 1. Apply Biquad High-Pass Filter (Direct Form I)
+      const x = sample;
+      const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
+      
+      // Shift state
+      this.x2 = this.x1;
+      this.x1 = x;
+      this.y2 = this.y1;
+      this.y1 = y;
+      
       sample = y;
 
-      // 2. Soft Clipping (Analog Saturation)
-      // Math.tanh gives a warm, compressed sound at high levels
+      // 2. Noise Gate
+      const absSample = Math.abs(sample);
+      let targetGain = 0.0;
+      
+      if (absSample > this.gateThreshold) {
+        targetGain = 1.0;
+        this.gateEnvelope = 1.0; 
+      } else {
+        this.gateEnvelope *= this.gateRelease;
+        targetGain = this.gateEnvelope;
+      }
+      sample *= targetGain;
+
+      // 3. Pre-gain for analog drive
+      sample *= this.preGain;
+
+      // 4. Soft Clipping (Analog Saturation)
       sample = Math.tanh(sample);
 
-      // 3. Accumulate squared sum for RMS
+      // 5. RMS accumulation
       this.sumSquares += sample * sample;
 
-      // 4. Convert float32 to int16
+      // 6. Output conversion
       let int16Value = sample * 32767;
 
-      // Check for clipping (even after tanh, if driven hard, it saturates)
-      if (Math.abs(int16Value) >= 32760) {
+      if (Math.abs(int16Value) >= 32700) {
         this.clipped = true;
       }
       

@@ -159,21 +159,34 @@ export default function StreamingConsole() {
 
       // SUPERVISOR CHECK
       // If the user's input is final and has substance, check for corrections
-      if (isFinal && text.trim().length > 5) {
+      
+      // Use the aggregated text from the store to ensure we capture the full context
+      // The 'text' argument might only be the final chunk.
+      const updatedTurns = useLogStore.getState().turns;
+      const updatedLast = updatedTurns[updatedTurns.length - 1];
+      const fullUserText = (updatedLast && updatedLast.role === 'user') ? updatedLast.text : text;
+
+      if (isFinal && fullUserText.trim().length > 2) {
         const currentPrompt = useSettings.getState().systemPrompt;
-        const history = useLogStore.getState().turns;
         
         setAnalyzing(true);
         // Run check asynchronously so we don't block
-        checkCorrection(API_KEY, currentPrompt, text, history)
+        checkCorrection(API_KEY, currentPrompt, fullUserText, updatedTurns)
           .then(result => {
              if (result.detected && result.newSystemPrompt) {
                addSuggestion({
                  id: crypto.randomUUID(),
                  timestamp: new Date(),
-                 originalFeedback: text,
+                 originalFeedback: fullUserText,
                  summary: result.summary || 'User correction',
                  newSystemPrompt: result.newSystemPrompt
+               });
+               
+               // LOGGING: Inject a system message into the chat stream so the user sees the correction was caught
+               addTurn({
+                 role: 'system',
+                 text: `⚡ Supervisor detected correction: "${result.summary}"`,
+                 isFinal: true
                });
              }
           })
@@ -207,7 +220,7 @@ export default function StreamingConsole() {
       if (!text && !groundingChunks) return;
 
       const turns = useLogStore.getState().turns;
-      const last = turns.at(-1);
+      const last = turns[turns.length - 1];
 
       if (last?.role === 'agent' && !last.isFinal) {
         const updatedTurn: Partial<ConversationTurn> = {
@@ -226,7 +239,8 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
-      const last = useLogStore.getState().turns.at(-1);
+      const turns = useLogStore.getState().turns;
+      const last = turns[turns.length - 1];
       if (last && !last.isFinal) {
         updateLastTurn({ isFinal: true });
       }
@@ -284,15 +298,15 @@ export default function StreamingConsole() {
                   <strong>Sources:</strong>
                   <ul>
                     {t.groundingChunks
-                      .filter(chunk => chunk.web)
+                      .filter(chunk => chunk.web?.uri)
                       .map((chunk, index) => (
                         <li key={index}>
                           <a
-                            href={chunk.web!.uri}
+                            href={chunk.web?.uri}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            {chunk.web!.title || chunk.web!.uri}
+                            {chunk.web?.title || chunk.web?.uri}
                           </a>
                         </li>
                       ))}

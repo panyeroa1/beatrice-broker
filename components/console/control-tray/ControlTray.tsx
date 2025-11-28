@@ -23,7 +23,7 @@ import cn from 'classnames';
 
 import { memo, ReactNode, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '../../../lib/audio-recorder';
-import { useSettings, useTools, useLogStore } from '@/lib/state';
+import { useSettings, useTools, useLogStore, useSupervisor } from '@/lib/state';
 
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 
@@ -153,6 +153,7 @@ function ControlTray({ children }: ControlTrayProps) {
     const { systemPrompt, model } = useSettings.getState();
     const { tools } = useTools.getState();
     const { turns } = useLogStore.getState();
+    const { suggestions } = useSupervisor.getState();
 
     const logData = {
       configuration: {
@@ -160,6 +161,7 @@ function ControlTray({ children }: ControlTrayProps) {
         systemPrompt,
       },
       tools,
+      suggestions,
       conversation: turns.map(turn => ({
         ...turn,
         timestamp: turn.timestamp.toISOString(),
