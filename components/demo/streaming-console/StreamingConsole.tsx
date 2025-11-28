@@ -107,7 +107,7 @@ export default function StreamingConsole() {
       
       const timeSinceActivity = Date.now() - lastActivityRef.current;
       
-      // Stage 1: 12 seconds - Gentle re-engagement
+      // Stage 1: 12 seconds - Short silence check-in
       if (timeSinceActivity > 12000 && silenceStageRef.current === 0) {
         silenceStageRef.current = 1;
         
@@ -124,17 +124,17 @@ export default function StreamingConsole() {
         });
       }
 
-      // Stage 2: 25 seconds - Persistent silence / Audio check
-      if (timeSinceActivity > 25000 && silenceStageRef.current === 1) {
+      // Stage 2: 45 seconds - Persistent silence / Audio check
+      if (timeSinceActivity > 45000 && silenceStageRef.current === 1) {
         silenceStageRef.current = 2;
         
         client.send([{ 
-          text: `[SYSTEM_NOTIFICATION: The user has been silent for 25 seconds. There might be an audio issue. Ask "Can you hear me?" or politely offer to pause the call if they are busy.]` 
+          text: `[SYSTEM_NOTIFICATION: The user has been silent for 45 seconds. There might be an audio issue. Ask "Can you hear me?" or politely offer to pause/end the call if they are busy.]` 
         }]);
 
         useLogStore.getState().addTurn({
           role: 'system',
-          text: '⚡ System: Persistent silence (25s) - Triggering connection check',
+          text: '⚡ System: Persistent silence (45s) - Triggering connection check',
           isFinal: true
         });
       }
