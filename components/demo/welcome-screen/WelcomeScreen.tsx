@@ -20,11 +20,11 @@ const welcomeContent: Record<Template, { title: string; description: string; pro
   },
   'leo': {
     title: 'Morgan (Eburon Estate)',
-    description: 'High-energy, Flemish-Belgian real estate agent. Fast-paced (1.2x), playful, and uses reverse psychology.',
+    description: 'Sharp, relatable Filipino Real Estate Agent. Speaks fluent Taglish with dialect switching (Ilocano, Bisaya). Uses reverse psychology and "tropa" vibes.',
     prompts: [
-      "I'm looking to buy a condo in Makati.",
-      "What's the market like for rentals right now?",
-      "Can you help me sell my house?",
+      "Magkano ang monthly?",
+      "Saan magandang investment ngayon?",
+      "Ayoko, mahal naman eh.",
     ],
   },
   'personal-assistant': {

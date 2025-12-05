@@ -179,7 +179,7 @@ export default function StreamingConsole() {
     }
     
     // Only add googleSearch if enabled AND supported (audio preview model does NOT support it)
-    if (googleSearch && model !== 'gemini-2.5-flash-native-audio-preview-09-2025') {
+    if (googleSearch && model !== 'models/gemini-2.5-flash-native-audio-preview-09-2025' && model !== 'gemini-2.5-flash-native-audio-preview-09-2025') {
       enabledTools.push({ googleSearch: {} });
     }
 
@@ -196,11 +196,12 @@ export default function StreamingConsole() {
           },
         },
       },
-      // Ensure these are present as per Live API requirements for transcription
-      inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" }, 
-      outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
-      // Send systemInstruction as a string to avoid complex Content object validation issues at handshake
-      systemInstruction: constructedSystemInstruction,
+      // Use empty objects to enable transcription with default settings.
+      // Explicitly setting the model ID here can cause "invalid argument" errors with the preview model.
+      inputAudioTranscription: {}, 
+      outputAudioTranscription: {},
+      // Send systemInstruction as a Content object to match schema
+      systemInstruction: { parts: [{ text: constructedSystemInstruction }] },
     };
 
     // CRITICAL: Only attach the 'tools' property if we actually have enabled tools.

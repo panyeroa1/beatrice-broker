@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -149,7 +150,12 @@ export class GenAILiveClient {
       this.emitter.emit('error', new ErrorEvent('Client is not connected'));
       return;
     }
-    this.session.sendClientContent({ turns: parts, turnComplete });
+    // Fix: Wrap parts in a Content object with role 'user' before sending.
+    // The API expects `turns` to be Content[], and Content is { parts: Part[], role?: string }
+    const partsArray = Array.isArray(parts) ? parts : [parts];
+    const content = { parts: partsArray, role: 'user' };
+    
+    this.session.sendClientContent({ turns: [content], turnComplete });
     this.log(`client.send`, parts);
   }
 
@@ -314,10 +320,11 @@ export class GenAILiveClient {
    * @param message - Log message
    */
   protected log(type: string, message: string | object) {
-    this.emitter.emit('log', {
+    const log: StreamingLog = {
+      date: new Date(),
       type,
       message,
-      date: new Date(),
-    });
+    };
+    this.emitter.emit('log', log);
   }
 }
