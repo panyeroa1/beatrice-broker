@@ -66,6 +66,10 @@ export default function StreamingConsole() {
   // Silence Detection Refs
   const lastActivityRef = useRef(Date.now());
   const silenceStageRef = useRef<number>(0); // 0 = none, 1 = warning, 2 = persistent
+  
+  // Initial Connection Refs
+  const hasGreetedRef = useRef(false);
+  const initialSilenceRef = useRef(false);
 
   // We need to access the API key to perform the supervisor check.
   const API_KEY = process.env.API_KEY as string;
@@ -74,6 +78,25 @@ export default function StreamingConsole() {
     setShowPopUp(false);
   };
 
+  // Reset refs when disconnected
+  useEffect(() => {
+    if (!connected) {
+      hasGreetedRef.current = false;
+      initialSilenceRef.current = false;
+      silenceStageRef.current = 0;
+    }
+  }, [connected]);
+
+  // Initial Greeting (Kickoff)
+  useEffect(() => {
+    if (connected && !hasGreetedRef.current) {
+      hasGreetedRef.current = true;
+      // Force the agent to speak first with a natural phone answering greeting
+      client.send([{ text: `[SYSTEM: Phone connected. Answer naturally with "Hello?".]` }]);
+    }
+  }, [connected, client]);
+
+  // Style update listener (handled separately to avoid re-triggering greeting)
   useEffect(() => {
     if (connected) {
       client.send([{ text: `Style: ${style}` }]);
@@ -86,6 +109,22 @@ export default function StreamingConsole() {
       if (!connected) return;
       
       const timeSinceActivity = Date.now() - lastActivityRef.current;
+      const currentTurns = useLogStore.getState().turns;
+
+      // START OF CALL SILENCE: "Hello? Who's this?"
+      // Check if we are at the very beginning (<= 1 turn, which is likely the agent's first hello)
+      // and user hasn't spoken for ~4.5 seconds.
+      if (
+        currentTurns.length <= 1 && 
+        timeSinceActivity > 4500 && 
+        !initialSilenceRef.current && 
+        silenceStageRef.current === 0
+      ) {
+         initialSilenceRef.current = true;
+         client.send([{ text: `[SYSTEM: User hasn't responded. Say "Hello? ... Who's this?" naturally with slight confusion.]` }]);
+         // We do not increment silenceStageRef here to allow standard logic to take over later if needed.
+         return; 
+      }
       
       // Stage 1: 12 seconds - Natural Contextual Re-engagement
       if (timeSinceActivity > 12000 && silenceStageRef.current === 0) {
@@ -180,6 +219,8 @@ export default function StreamingConsole() {
       // Update activity timestamp on ANY user input
       lastActivityRef.current = Date.now();
       silenceStageRef.current = 0;
+      // If user speaks, we consider the initial silence broken
+      initialSilenceRef.current = true;
 
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
