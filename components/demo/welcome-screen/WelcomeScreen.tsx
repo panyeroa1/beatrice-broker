@@ -19,8 +19,8 @@ const welcomeContent: Record<Template, { title: string; description: string; pro
     ],
   },
   'leo': {
-    title: 'Leo (Eburon Estate)',
-    description: 'High-trust, authentic property broker. Phone-call style, natural, and efficient.',
+    title: 'Morgan (Eburon Estate)',
+    description: 'High-energy, Flemish-Belgian real estate agent. Fast-paced (1.2x), playful, and uses reverse psychology.',
     prompts: [
       "I'm looking to buy a condo in Makati.",
       "What's the market like for rentals right now?",
@@ -57,7 +57,7 @@ const WelcomeScreen: React.FC = () => {
           <span className="welcome-icon">mic</span>
           <div className="title-selector">
             <select value={template} onChange={(e) => setTemplate(e.target.value as Template)} aria-label="Select a template">
-              <option value="leo">Leo (Eburon Estate)</option>
+              <option value="leo">Morgan (Eburon Estate)</option>
               <option value="customer-support">Beatrice (Real Estate)</option>
               <option value="personal-assistant">Personal Assistant</option>
               <option value="navigation-system">Navigation System</option>

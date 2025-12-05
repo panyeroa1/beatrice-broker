@@ -6,7 +6,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PopUp from '../popup/PopUp';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
-// FIX: Import LiveServerContent to correctly type the content handler.
 import { LiveConnectConfig, Modality, LiveServerContent, Tool } from '@google/genai';
 
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
@@ -56,7 +55,7 @@ const renderContent = (text: string) => {
 
 export default function StreamingConsole() {
   const { client, setConfig, connected } = useLiveAPIContext();
-  const { systemPrompt, voice, style, googleSearch } = useSettings();
+  const { systemPrompt, voice, style, googleSearch, model } = useSettings();
   const { tools } = useTools();
   const turns = useLogStore(state => state.turns);
   const { addSuggestion, setAnalyzing } = useSupervisor();
@@ -69,7 +68,6 @@ export default function StreamingConsole() {
   const silenceStageRef = useRef<number>(0); // 0 = none, 1 = warning, 2 = persistent
 
   // We need to access the API key to perform the supervisor check.
-  // Ideally this is passed via context, but process.env is accessible here.
   const API_KEY = process.env.API_KEY as string;
 
   const handleClosePopUp = () => {
@@ -98,7 +96,6 @@ export default function StreamingConsole() {
           text: `[SYSTEM_NOTIFICATION: User has been silent for 12 seconds. ACTION: Re-engage by recalling a specific significant topic/detail we discussed earlier. Use a natural transition like "Actually, before I forget..." or "I was actually contemplating what you said about..." or "You mentioned earlier that...". Do NOT just say "Hello". Make it feel like a spontaneous thought.]` 
         }]);
 
-        // Log to console UI
         useLogStore.getState().addTurn({
           role: 'system',
           text: `⚡ System: Silence detected (12s) - Requesting context recall re-engagement`,
@@ -142,12 +139,15 @@ export default function StreamingConsole() {
       enabledTools.push({ functionDeclarations });
     }
     
-    if (googleSearch) {
+    // Only add googleSearch if enabled AND supported (audio preview model does NOT support it)
+    if (googleSearch && model !== 'gemini-2.5-flash-native-audio-preview-09-2025') {
       enabledTools.push({ googleSearch: {} });
     }
 
-    // Using `any` for config to accommodate `speechConfig`, which is not in the
-    // current TS definitions but is used in the working reference example.
+    const constructedSystemInstruction = systemPrompt + (style && style !== 'Neutral' ? `\n\nStyle: ${style}` : '');
+
+    // Using `any` to accommodate potential type mismatches in the SDK vs implementation
+    // specifically for speechConfig and tools strictness.
     const config: any = {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
@@ -157,20 +157,21 @@ export default function StreamingConsole() {
           },
         },
       },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
-      systemInstruction: {
-        parts: [
-          {
-            text: systemPrompt + (style && style !== 'Neutral' ? `\n\nStyle: ${style}` : ''),
-          },
-        ],
-      },
-      tools: enabledTools,
+      // Ensure these are present as per Live API requirements for transcription
+      inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" }, 
+      outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
+      // Send systemInstruction as a string to avoid complex Content object validation issues at handshake
+      systemInstruction: constructedSystemInstruction,
     };
 
+    // CRITICAL: Only attach the 'tools' property if we actually have enabled tools.
+    // Sending `tools: []` or `tools: undefined` explicitly can cause the API handshake to fail.
+    if (enabledTools.length > 0) {
+      config.tools = enabledTools;
+    }
+
     setConfig(config);
-  }, [setConfig, systemPrompt, tools, voice, style, googleSearch]);
+  }, [setConfig, systemPrompt, tools, voice, style, googleSearch, model]);
 
   useEffect(() => {
     const { addTurn, updateLastTurn } = useLogStore.getState();
@@ -178,7 +179,6 @@ export default function StreamingConsole() {
     const handleInputTranscription = async (text: string, isFinal: boolean) => {
       // Update activity timestamp on ANY user input
       lastActivityRef.current = Date.now();
-      // Revoke silence trigger immediately
       silenceStageRef.current = 0;
 
       const turns = useLogStore.getState().turns;
@@ -193,10 +193,6 @@ export default function StreamingConsole() {
       }
 
       // SUPERVISOR CHECK
-      // If the user's input is final and has substance, check for corrections
-      
-      // Use the aggregated text from the store to ensure we capture the full context
-      // The 'text' argument might only be the final chunk.
       const updatedTurns = useLogStore.getState().turns;
       const updatedLast = updatedTurns[updatedTurns.length - 1];
       const fullUserText = (updatedLast && updatedLast.role === 'user') ? updatedLast.text : text;
@@ -205,7 +201,6 @@ export default function StreamingConsole() {
         const currentPrompt = useSettings.getState().systemPrompt;
         
         setAnalyzing(true);
-        // Run check asynchronously so we don't block
         checkCorrection(API_KEY, currentPrompt, fullUserText, updatedTurns)
           .then(result => {
              if (result.detected && result.newSystemPrompt) {
@@ -217,7 +212,6 @@ export default function StreamingConsole() {
                  newSystemPrompt: result.newSystemPrompt
                });
                
-               // LOGGING: Inject a system message into the chat stream so the user sees the correction was caught
                addTurn({
                  role: 'system',
                  text: `⚡ Supervisor detected correction: "${result.summary}"`,
@@ -230,7 +224,6 @@ export default function StreamingConsole() {
     };
 
     const handleOutputTranscription = (text: string, isFinal: boolean) => {
-      // Update activity timestamp when agent speaks
       lastActivityRef.current = Date.now();
       
       const turns = useLogStore.getState().turns;
@@ -245,8 +238,6 @@ export default function StreamingConsole() {
       }
     };
 
-    // FIX: The 'content' event provides a single LiveServerContent object.
-    // The function signature is updated to accept one argument, and groundingMetadata is extracted from it.
     const handleContent = (serverContent: LiveServerContent) => {
       const text =
         serverContent.modelTurn?.parts
@@ -277,7 +268,6 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
-      // Ensure we count the end of the agent's turn as activity
       lastActivityRef.current = Date.now();
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
